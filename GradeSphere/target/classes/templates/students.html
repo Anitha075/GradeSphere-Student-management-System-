@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GradeSphere - Students</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-dark text-light">
+<nav class="navbar navbar-expand-lg navbar-dark bg-black border-bottom border-secondary mb-4">
+    <div class="container-fluid">
+      <span class="navbar-brand fw-bold text-primary">
+    📊 GradeSphere
+</span>
+        <div class="d-flex gap-2">
+            <form th:action="@{/students/import/json}" method="post" enctype="multipart/form-data" class="d-flex gap-2">
+                <input type="file" name="file" accept="application/json" class="form-control form-control-sm" style="max-width: 220px;">
+                <button type="submit" class="btn btn-outline-light btn-sm">Import JSON</button>
+            </form>
+            <a th:href="@{/students/export/json}" class="btn btn-outline-info btn-sm">Export JSON</a>
+            <a th:href="@{/students/export/csv}" class="btn btn-outline-success btn-sm">Export CSV</a>
+            <a th:href="@{/logout}" class="btn btn-outline-danger btn-sm">Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <!-- Stats row -->
+    <div class="row mb-3 g-3">
+        <div class="col-md-3">
+            <div class="card text-bg-dark border-secondary h-100">
+                <div class="card-body py-2">
+                    <h6 class="card-subtitle text-muted">Total Students</h6>
+                    <h4 class="card-title mb-0" th:text="${count}">0</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-dark border-secondary h-100">
+                <div class="card-body py-2">
+                    <h6 class="card-subtitle text-muted">Average of Averages</h6>
+                    <h4 class="card-title mb-0" th:text="${#numbers.formatDecimal(avgAll, 1, 2)}">0.00</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-dark border-secondary h-100">
+                <div class="card-body py-2">
+                    <h6 class="card-subtitle text-muted">Average by Subject</h6>
+                    <small class="text-muted">
+                        Math: <span th:text="${#numbers.formatDecimal(avgMath,1,1)}">0.0</span> &nbsp;|&nbsp;
+                        Sci: <span th:text="${#numbers.formatDecimal(avgScience,1,1)}">0.0</span> &nbsp;|&nbsp;
+                        Eng: <span th:text="${#numbers.formatDecimal(avgEnglish,1,1)}">0.0</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-dark border-secondary h-100">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <h6 class="card-subtitle text-muted mb-0">Grade Distribution</h6>
+                        <a th:href="@{/students/new}" class="btn btn-sm btn-primary">Add Student</a>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1">
+                        <span class="badge bg-success">A:
+                            <span th:text="${gradeCounts['A']}">0</span>
+                        </span>
+                        <span class="badge bg-primary">B:
+                            <span th:text="${gradeCounts['B']}">0</span>
+                        </span>
+                        <span class="badge bg-warning text-dark">C:
+                            <span th:text="${gradeCounts['C']}">0</span>
+                        </span>
+                        <span class="badge bg-secondary">D:
+                            <span th:text="${gradeCounts['D']}">0</span>
+                        </span>
+                        <span class="badge bg-danger">F:
+                            <span th:text="${gradeCounts['F']}">0</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart row -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card text-bg-dark border-secondary">
+                <div class="card-header py-2">
+                    <span class="fw-semibold">Subject Averages</span>
+                </div>
+                <div class="card-body">
+                    <canvas id="subjectChart" height="120"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card text-bg-dark border-secondary">
+                <div class="card-header py-2">
+                    <span class="fw-semibold">Grade Distribution</span>
+                </div>
+                <div class="card-body">
+                    <canvas id="gradeChart" height="120"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters + table -->
+    <div class="card text-bg-dark border-secondary">
+        <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
+            <span class="fw-semibold">Students</span>
+            <div class="d-flex flex-wrap gap-2">
+                <input type="text" id="searchBox" class="form-control form-control-sm"
+                       placeholder="Search by name..." oninput="applyFilters()">
+                <select id="gradeFilter" class="form-select form-select-sm" onchange="applyFilters()">
+                    <option value="">All grades</option>
+                    <option value="A">A only</option>
+                    <option value="B">B only</option>
+                    <option value="C">C only</option>
+                    <option value="D">D only</option>
+                    <option value="F">F only</option>
+                </select>
+                <input type="number" id="minAvgFilter" class="form-control form-control-sm"
+                       style="max-width: 120px;" placeholder="Min Avg" oninput="applyFilters()">
+                <select id="sortBy" class="form-select form-select-sm" onchange="applyFilters()">
+                    <option value="">Sort: none</option>
+                    <option value="nameAsc">Name ↑</option>
+                    <option value="nameDesc">Name ↓</option>
+                    <option value="avgAsc">Average ↑</option>
+                    <option value="avgDesc">Average ↓</option>
+                </select>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-dark table-striped table-hover align-middle mb-0" id="studentsTable">
+                <thead class="table-secondary text-dark">
+                <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Math</th>
+                    <th scope="col">Science</th>
+                    <th scope="col">English</th>
+                    <th scope="col">Average</th>
+                    <th scope="col">Grade</th>
+                    <th scope="col" class="text-center">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="s : ${students}">
+                    <td th:text="${s.id}"></td>
+                    <td th:text="${s.name}"></td>
+                    <td th:text="${s.mathMarks}"></td>
+                    <td th:text="${s.scienceMarks}"></td>
+                    <td th:text="${s.englishMarks}"></td>
+                    <td th:text="${#numbers.formatDecimal(s.average, 1, 2)}"></td>
+                    <td>
+                        <span class="badge"
+                              th:text="${s.grade}"
+                              th:classappend="${s.grade} == 'A' ? ' bg-success' :
+                                              (s.grade == 'B' ? ' bg-primary' :
+                                              (s.grade == 'C' ? ' bg-warning text-dark' :
+                                              (s.grade == 'D' ? ' bg-secondary' : ' bg-danger')))">
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <a th:href="@{'/students/edit/' + ${s.id}}" class="btn btn-sm btn-outline-info me-1">Edit</a>
+                        <a th:href="@{'/students/delete/' + ${s.id}}"
+                           class="btn btn-sm btn-outline-danger"
+                           onclick="return confirm('Delete this student?');">Delete</a>
+                    </td>
+                </tr>
+                <tr th:if="${students.isEmpty()}">
+                    <td colspan="8" class="text-center text-muted py-3">
+                        No students yet. Click "Add Student" to create one.
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    // Chart data from model
+    const avgMath = [[${avgMath}]];
+    const avgScience = [[${avgScience}]];
+    const avgEnglish = [[${avgEnglish}]];
+
+    const gradeCounts = [[${gradeCounts}]];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const subjectCtx = document.getElementById('subjectChart');
+        if (subjectCtx) {
+            new Chart(subjectCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Math', 'Science', 'English'],
+                    datasets: [{
+                        label: 'Average Marks',
+                        data: [avgMath, avgScience, avgEnglish]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        const gradeCtx = document.getElementById('gradeChart');
+        if (gradeCtx) {
+            const labels = ['A', 'B', 'C', 'D', 'F'];
+            const data = labels.map(l => gradeCounts[l] || 0);
+            new Chart(gradeCtx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data
+                    }]
+                },
+                options: { responsive: true }
+            });
+        }
+    });
+
+    function applyFilters() {
+        const q = document.getElementById('searchBox').value.toLowerCase();
+        const grade = document.getElementById('gradeFilter').value;
+        const minAvgStr = document.getElementById('minAvgFilter').value;
+        const sortBy = document.getElementById('sortBy').value;
+
+        const tbody = document.querySelector('#studentsTable tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.querySelector('td'));
+
+        // Filter
+        let filtered = rows.filter(row => {
+            const nameCell = row.children[1];
+            const avgCell = row.children[5];
+            const gradeBadge = row.children[6].querySelector('.badge');
+
+            const name = nameCell.textContent.toLowerCase();
+            const avg = parseFloat(avgCell.textContent) || 0;
+            const g = gradeBadge ? gradeBadge.textContent.trim() : '';
+
+            if (q && !name.includes(q)) return false;
+            if (grade && g !== grade) return false;
+            if (minAvgStr && avg < parseFloat(minAvgStr)) return false;
+
+            return true;
+        });
+
+        // Sort
+        if (sortBy) {
+            filtered.sort((a, b) => {
+                const nameA = a.children[1].textContent.toLowerCase();
+                const nameB = b.children[1].textContent.toLowerCase();
+                const avgA = parseFloat(a.children[5].textContent) || 0;
+                const avgB = parseFloat(b.children[5].textContent) || 0;
+
+                switch (sortBy) {
+                    case 'nameAsc':
+                        return nameA.localeCompare(nameB);
+                    case 'nameDesc':
+                        return nameB.localeCompare(nameA);
+                    case 'avgAsc':
+                        return avgA - avgB;
+                    case 'avgDesc':
+                        return avgB - avgA;
+                    default:
+                        return 0;
+                }
+            });
+        }
+
+        // Clear and re-add in new order + visibility
+        rows.forEach(r => r.style.display = 'none');
+        filtered.forEach(r => {
+            r.style.display = '';
+            tbody.appendChild(r);
+        });
+    }
+</script>
+</body>
+</html>

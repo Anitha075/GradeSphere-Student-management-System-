@@ -1,0 +1,9 @@
+[ {
+  "id" : 1,
+  "name" : "Abhi",
+  "mathMarks" : 100,
+  "scienceMarks" : 100,
+  "englishMarks" : 50,
+  "average" : 83.33333333333333,
+  "grade" : "B"
+} ]
